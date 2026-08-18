@@ -31,14 +31,14 @@ Probiert auch gerne noch andere Möglichkeiten aus.
 ### Übung 2
 
  Was passiert, wenn ihr folgende Tastenkombination eingebt:
+
  ```
- <Strg+r><zeichenfolge> gefolgt von <Strg+r> (mehrmals)
+ <Strg+r> dann eine <zeichenfolge> gefolgt von <Strg+r> (mehrmals)
  ```
+
  also z.B.
- ```
- <Strg+r>man
- ```
- und dann `<Strg+n>` drückt?
+
+`<Strg+r>` drücken, dann `man` eingeben und dann (wiederholt) `<Strg+n>` drücken?
  
 ### Übung 3
 
