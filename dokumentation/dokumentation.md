@@ -70,7 +70,32 @@ ls -l /etc /home -a # Übergabe mehrerer Optionen und Argumente
 
 *Kurzhilfe* zu einem Kommando durch Übergabe der Option `--help` -> `ls --help`
 
-TODO
+### Shell-Builtins
+
+In die Shell (in unserem Fall BASH) eingebaute Kommandos. Sie sind essenziell bzw. wichtig, damit die Shell an sich funktioniert, z.B. das Kommando `cd`. 
+
+Builtins haben keine eigene Manpage, ihre Funktionsweise ist in der Manpage der BASH erklärt. Eine Kurzhilfe zu den Builtins erhält man mit dem Kommando `help`.
+
+Eine Übersicht über alle Shell-Builtins können wir uns mit dem Kommando `help` ohne Argumente anzeigen lassen.
+
+### Extern realisierte Kommandos
+
+Die meisten Kommandos sind _extern realisiert_, d.h. sie sind nicht in die BASH eingebaut. So gut wie alle _extern realisierten_ Kommandos haben eine Manpage (`man <kommando>`) in welcher die Art wie das Kommando zu benutzen ist und sämtliche Optionen mit Erklärungen angegeben sind.
+
+#### Kommando `type`
+
+Mit dem Kommando `type` können wir herausfinden, ob ein Kommando extern realisiert, ein Builtin oder ein Alias ist:
+
+```bash
+type cd 
+> cd is a shell builtin
+
+type rm
+> rm is /usr/bin/rm
+
+type ls
+> ls is aliased to `ls --color=auto'
+```
 
 ## Dateioperationen
 
@@ -91,7 +116,11 @@ mkdir <name-des-verzeichnisses>
 mkdir <pfad-zum-verzeichniss>
 ```
 
-TODO
+Wollen wir eine komplette Verzeichnisstruktur erstellen, also mehere Verzeichnisebenen auf einmal, müssen wir `mkdir` die Option `-p` übergeben:
+
+```bash
+mkdir -p ~/Dir/SubDir/SubSubDir/SubSubSubDir
+```
 
 ### Dateien/Verzeichnisse kopieren mit `cp`
 
@@ -120,7 +149,6 @@ Der Grund ist, dass ein Verzeichnis nicht leer ist, die Kopieraktion also wieder
 Dateien und Verzeichnisse können mit dem Kommando `rm` (*remove*) gelöscht werden.
 
 Analog zum Kopieren von Verzeichnissen müssen wir auch beim Löschen von Verzeichnissen die Option `-r` angeben.
-
 
 ```bash
 rm <pfad-zur-datei>
@@ -196,7 +224,77 @@ cp somefile Somedir/
 - `.` (Punkt) symbolisiert das aktuelle Verzeichnis
 - `..` (doppelter Punkt) symbolisiert das übergeordnete Verzeichnis (Parent Directory)
 
+## History
 
+Eine Liste aller bisher eingegebenen Kommandos.
+
+- Blättern durch die History mit den Pfeiltasten oder `STRG+P` bzw. `STRG+N`
+- Die History wird zuerst pro Shell im RAM gespeichert, beim Beenden der Shell wird die History in eine Datei geschrieben (z.B. `.bash_history` oder auch `.zsh_history`)
+- Die Gröẞe der Datei bzw. die Menge der Einträge kann konfiguriert werden
+- Jeder Benutzer hat somit seine eigene History (so z.B. auch der User `root`)
+- Mit dem Kommando `history` wird eine Liste aller Befehle inklusive eines Index angezeigt
+- Wir können so das Konzept der *History Expansion* nutzen:
+  - `!<index>` ruft das Kommando mit `<index>` auf
+  - `!-<zahl>` ruft das Kommando mit `<zahl>` von hinten auf
+  - `!<zeichenfolge>` ruft das letzte Kommando auf, das mit `<zeichenfolge>` begonnen hat
+  - `!?<zeichenfolge>` ruft das letzte Kommando auf, das `<zeichenfolge>` enthält
+  - `!$` ruft das letzte Argument des letzten Kommanods auf:
+  ```bash
+  mkdir with-a-very-long-name-or-path
+  cd !$
+  ```
+- Die Tastenkombination `<STRG r>` ruft die *reverse-i-search* auf, so dass wir eine Zeichenfolge eingeben können und das Kommando, welches Zeichenfolge enthält angezeigt wird. Durch erneutes Drücken von `<STRG r>` rufen wir das vorletzte Kommando mit dieser Zeichenfolge auf, mit `<Shift STRG r>` können wir wieder nach vorne blättern usw.
+
+## Pattern Matching / Globbing / Wildcards
+
+Ein *Pattern* ist ein *Muster*, bzw. ein *Platzhalter* oder *Wildcard* welches auf eine Zeichenfolge passt, so dass wir damit z.B. nach Dateien bzw. Pfadangaben suchen können (mit entsprechenden Kommandos) bzw. mehrere Dateien auf einmal ansprechen können.
+
+*Globbing Characters/Wildcard:*
+
+- `*` (*Asterisk*) -> Steht für beliebige Zeichen, welche beliebig oft vorkommen können (auch keinmal)
+- `?` -> Steht für jedes beliebige Zeichen, welches **exakt** einmal vorkommt
+- `[zeichen1zeichen2]` Passt sowohl auf `zeichen1` als auch auf `zeichen2`
+- `[A-D]` Passt auf `A`, `B`, `C` oder `D`
+- `[1-9]` Passt auf die Ziffern `1` bis `9`
+
+Weitere Möglichkeiten für Pattern Matching:
+
+- `[!pattern]` Exkludiert das angegebene Pattern (in dem Pattern dürfen auch wieder die oben angegebenen *Globbing Characters* vorkommen
+- `!(pattern)` Exkludiert das angegebene Pattern (in dem Pattern dürfen auch wieder die oben angegebenen *Globbing Characters* vorkommen
+
+Beispiele:
+```bash
+rm *.jpg       # löscht alle Dateien mit der Endung .jpg
+
+ls datei?.txt  # zeigt nur Dateien an, bei denen nach der Zeichenfolge datei noch ein weiteres beliebiges Zeichen folgt und die die Endung .txt haben
+
+mv !(o*) ../somdir/    # verschiebt alle Dateien des aktuellen Verzeichnisses nach ../somedir, ausser Dateien, die mit einem o beginnen
+
+mv [!o]* ../somdir/    # verschiebt alle Dateien des aktuellen Verzeichnisses nach ../somedir, ausser Dateien, die mit einem o beginnen
+```
+
+TODO Brace Expansion
+
+## Escaping / Qouting / Maskieren
+
+Bestimmte Zeichen haben eine Sonderbedeutung für die BASH. Das wohl wichtigste Sonderzeichen ist das *Leerzeichen*: 
+
+> Das Leerzeichen ist ein Sonderzeichen. Das Leerzeichen ist das **Trennzeichen**. Das Trennzeichen ist elementar wichtig für die Shell, um z.B. ein Kommando von seinen Optionen und Argumenten unterscheiden zu können.
+
+Weitere Sonderzeichen sind:
+```bash
+*       # Asterisk (Globbing)
+?       # Fragezeichen (Globbing)
+#       # Kommentarzeichen
+$       # Subsitution
+!       # History Expansion
+\       # Backslash (Escaping)
+'       # Escaping
+"       # Escaping
+;       # beendet eine Eingabe
+```
+
+TODO
 
 
 
