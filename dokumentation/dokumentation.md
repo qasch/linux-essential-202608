@@ -273,7 +273,52 @@ mv !(o*) ../somdir/    # verschiebt alle Dateien des aktuellen Verzeichnisses na
 mv [!o]* ../somdir/    # verschiebt alle Dateien des aktuellen Verzeichnisses nach ../somedir, ausser Dateien, die mit einem o beginnen
 ```
 
-TODO Brace Expansion
+## Brace Expansion
+
+Brace Expansion ist im Gegensatz zum Globbing eine reine *Textersetzung* (und kein Vergleich mit einem Suchmuster), die die Shell durchführt, bevor überhaupt irgendein Kommando ausgeführt wird. Sie erzeugt aus einem Muster mit `{}` mehrere Wörter/Strings – unabhängig davon, ob diese Dateien tatsächlich existieren.
+
+- `{}` - "Erzeuge mir diese Strings" (Textebene, vor Ausführung), funktioniert auch ohne existierende Dateien
+- `[ ]` - "Zeig mir, was im Dateisystem tatsächlich zu diesem Muster passt" (Dateiebene, hängt vom realen Inhalt ab), passt nur auf existierende Dateien
+
+### Beispiele
+
+#### 1. Liste (kommagetrennt)
+
+```bash
+echo datei_{eins,zwei,drei}.txt
+# → datei_eins.txt datei_zwei.txt datei_drei.txt
+```
+
+#### 2. Zahlenbereich
+
+```bash
+echo bild{1..5}.jpg
+# → bild1.jpg bild2.jpg bild3.jpg bild4.jpg bild5.jpg
+
+echo {10..1}
+# → 10 9 8 7 6 5 4 3 2 1   (rückwärts geht auch)
+```
+
+#### 3. Buchstabenbereich
+
+```bash
+echo {a..e}
+# → a b c d e
+```
+
+#### 4. Mit Schrittweite
+
+```bash
+echo {0..20..5}
+# → 0 5 10 15 20
+```
+
+#### 5. Verschachtelt / kombiniert
+
+```bash
+mkdir -p projekt/{src,docs,tests}/{de,en}
+# legt an: projekt/src/de projekt/src/en projekt/docs/de ... usw.
+```
 
 ## Escaping / Qouting / Maskieren
 
@@ -295,6 +340,8 @@ $       # Subsitution
 ```
 
 TODO
+
+## Aliase
 
 
 
