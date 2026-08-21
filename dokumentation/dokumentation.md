@@ -552,6 +552,239 @@ done < <(echo -e "1\n2\n3")
 echo "Count: $count"  # zeigt 3
 ```
 
+## Textströme und Standardkanäle
+
+ Kanalbezeichnung | Filedescriptor | Nummer |
+| ---------------- | -------------- | ------ |
+| *Standareingabekanal*  | `stdin` | 0 |
+| *Standardausgabekanal*|  `stdout` | 1 |
+| *Standardfehlerkanal*  | `stderr` | 2 |
+
+
+Jeder Prozess der gestartet wird, wird mit diesen drei Standardkanälen verbunden. Über diese Kanäle erhält der Prozess Daten und gibt sie auch wieder aus. So können Ein- und Ausgaben unabhängig voneinander verarbeitet und auch umgeleitet werden.
+
+Die Kanäle jedes Prozesses, der in einer Shell gestartet wird, sind automatisch mit der Shell verbunden.
+
+Durch dieses Konzept können wir durch die Kombination simpler Kommandos komplexe Aufaben lösen (-> *Kommandopipelines*) 
+
+Wir können so z.B. auch Ausgaben von Kommandos in Dateien umleiten (-> *Redirects*).
+
+## UNIX Philosophie
+
+Die Unix-Philosophie ist ein Satz von Prinzipien für Software-Design, die ursprünglich in den 1970er Jahren mit dem Unix-Betriebssystem entwickelt wurden. Sie betont Einfachheit, Modularität und Wiederverwendbarkeit.
+
+Douglas McIlroy, der Erfinder der Unixpipes, fasste die Philosophie folgendermaßen zusammen:
+
+- Schreibe Computerprogramme so, dass sie nur eine Aufgabe erledigen und diese gut machen.
+- Schreibe Programme so, dass sie zusammenarbeiten.
+- Schreibe Programme so, dass sie Textströme verarbeiten, denn das ist eine universelle Schnittstelle.
+
+> "Write programs that do one thing and do it well."
+
+## KISS Prinzip
+
+- "Keep it stupid simple"
+- "Keep it super simple"
+- "Keep it simple, stupid!"
+
+## Redirects
+
+Mit Redirects kann die der Standardausgabekanal oder der Standardfehlerkanal in eine **Datei** umgeleitet werden. Es gibt zwei Arten von Redirects:
+
+- `>` - einfacher Redirect: Erstellt eine Datei falls nicht vorhanden, **leert** eine bereits vorhandene Datei
+- `>>` - doppelter Redirect: Erstellt eine Datei falls nicht vorhanden, **hängt Ausgabe an**
+
+#### Umleitung des Standardausgabekanals
+```bash
+echo huhu 1> hallo.txt   # die 1 gibt hier die Kanalnummer an
+echo huhu 1>> hallo.txt  # die 1 gibt hier die Kanalnummer an
+echo huhu > hallo.txt    # kann bei stdout auch weggelassen werden
+```
+```bash
+ls -l /etc > ls-ausgabe.txt
+ls -l /etc >> ls-ausgabe.txt
+```
+
+#### Umleitung des Standardfehlerkanals
+```bash
+ls mich-gibts-nicht  2> ls-fehler.txt     # hier muss die 2 stehen, da wir stderr umleiten
+ls mich-gibts-nicht  2>> ls-fehler.txt    # hier muss die 2 stehen, da wir stderr umleiten
+```
+
+#### Umleitung beider Kanäle
+
+##### in separate Dateien
+```bash
+ls mich-gibts/ mich-gibts-nicht/ 1> ergebnis.txt 2>fehler.txt
+ls mich-gibts/ mich-gibts-nicht/ > ergebnis.txt 2>fehler.txt
+```
+
+##### in die gleiche Datei
+```bash
+ls mich-gibts/ mich-gibts-nicht/ > ergebnis-und-fehler.txt 2>&1
+```
+
+>[!NOTE]
+> Das `&` gibt hier an, dass wir einen *Kanal*/*Filedescriptor* meinen, ansonsten würden die Fehler in eine Datei mit dem Namen `1` umgeleitet werden.
+> Das `2>&1` muss in diesem Fall hinter dem `>` stehen, da die Redirects an sich von links nach rechts ausgewertet werden. `stdout` muss also bereits in die Datei umgeleitet sein, damit auch `stderr` dorthin schreibt. Ansonsten würde der Fehlerkanal mit dem *eigentlichen* Ziel, nämlich der Shell verknüpft werden.
+
+>[!NOTE]
+> Verkürzte Schreibweise:
+> ```bash
+> ls mich-gibts/ mich-gibts-nicht/ &> ergebnis-und-fehler.txt
+>``
+
+
+###### Eigenbaulösung
+
+Theoretisch könnte man sich obiges Verhalten auch selber bauen, z.B. so:
+```bash
+ls mich-gibts/ mich-gibts-nicht/ > ergebnis-und-fehler.txt 2>> ergebnis-und-fehler.txt
+```
+
+Das **kann** gut gehen, aber auch zu einem nicht gewollten Verhalten führen, da beide Filedescriptoren versuchen, **zur gleichen Zeit** in die gleiche Datei zu schreiben, was zu einer *Race Condition* führen kann:
+
+|Zeitpunkt | stdout schreibt | stderr schreibt | Dateiinhalt |
+| -------- | --------------- | --------------- | ----------- |
+|t0         | (Position 0)    | (Position 0)   | ""          |
+|t1         | "mich-gibts:\n"    | -               | "mich-gibts:\n" |
+|           |(Position → 12)  |     (Position 0)|        |
+|t2         |"test\n"         | -              | "mydir:\ntest\n"|
+|           |(Position → 17)  |     (Position 0)|  |
+|t3         | -               | "ls: cannot access..."|"ls: cannot a..."|
+|           |                 | (Position → 65) | |
+
+
+Das Problem: Beide Zeiger starten bei Position 0.
+
+Wenn `stderr` später schreibt, überschreibt es teilweise das, was `stdout` geschrieben hat. Die genaue Ausgabe hängt davon ab:
+
+- Wie schnell die Prozesse schreiben
+- Wann das Betriebssystem die Schreiboperationen ausführt
+- Puffergröße und Timing
+
+Daher erscheint entweder gar keine Fehlermeldung, oder sie ist abgeschnitten etc.
+
+In der Regel erscheint die Ausgabe des Fehlerkanals vor der Ausgabe des Standardfehlerkanals, da der Fehlerkanal *ungepuffert* ist, im Gegensatz zum gepufferten Ausgabekanal.
+
+##### Warum funktioniert `2>&1`?
+- `>`  öffnet Filedescriptor 1 für die Datei
+- `2>&1` macht Filedescriptor 2 zu einer Kopie von Filedescriptor 1
+- Beide teilen sich denselben Schreibzeiger
+- Die Shell koordiniert die Schreibvorgänge, so dass es zu keinen Überschreibungen kommt
+
+#### Umleitung des Inhalts einer Datei an ein Kommando
+
+Wir können auch den Inhalt einer Datei in `stdin` umleiten mit einem "umgedrehten" Redirect `<`. 
+
+Das ist z.B. beim Kommando `tr` nötig, da `tr` keinen Dateinamen als Argument entgegennimmt:
+```bash
+# Ersetzung von , durch ;
+tr "," ";" < file.csv
+```
+
+>[!NOTE]
+> Obige Syntax führt nicht zu einer Ersetzung innerhalb der Datei, sondern erzeugt nur eine Ausgabe auf `stdout` mit den ersetzten Zeichen.
+
+```bash
+# Ersetzung von , durch ;, Erstellen einer Datei mit dem Ergebnis
+tr "," ";" < file.csv > file-new.csv
+```
+
+>[!NOTE]
+> Eine Ersetzung in der gleichen Datei ist so mit `tr` nicht möglich. Dazu könnte man andere Kommandos wie z.B. `sed` verwenden.
+
+#### Weitere Möglichkeiten für Umleitungen des Eingabekanals mit `<<` und `<<<`
+
+##### `<<` (Here-Document / Heredoc)
+
+Leitet mehrzeiligen Text als Eingabe an einen Befehl weiter, bis eine Endmarkierung erreicht wird.
+
+```bash
+cat << EOF
+Zeile 1
+Zeile 2
+EOF
+```
+
+- `EOF` ist frei wählbar (Konvention), muss am Anfang und Ende identisch sein
+- Variablen (`$VAR`) werden standardmäßig expandiert
+- Mit `<< 'EOF'` (Anführungszeichen um die Marke) wird keine Expansion durchgeführt – der Text bleibt "wörtlich"
+- `<<-` erlaubt zusätzlich führende Tabs vor der Endmarkierung (nicht Leerzeichen)
+
+##### `<<<` (Here-String)
+
+Leitet eine einzelne Zeile/einen einzelnen String als Eingabe weiter – kompakter als Heredoc für kurze Eingaben.
+
+```bash
+cat <<< "Hallo Welt"
+grep "Fehler" <<< "$log_variable"
+```
+
+Kurz gesagt: `<<` für mehrzeilige Textblöcke, `<<<` für einzelne Strings/Variablen.
+
+### Gerätedatei `/dev/null`
+
+
+`/dev/null` ist eine spezielle Gerätedatei (*Character Device*) unter Unix/Linux-Systemen, das alle Daten, die hineingeschrieben werden, sofort verwirft. Es wird oft als "Null-Gerät" oder als das "Schwarze Loch" eines Linux Systems bezeichent.
+
+#### Funktionsweise:
+
+Schreiben nach `/dev/null`: Alle Daten, die an `/dev/null` gesendet werden, gehen verloren – es wird nichts gespeichert. Der Schreibvorgang meldet dabei trotzdem Erfolg zurück.
+
+Lesen von `/dev/null`: Liefert sofort ein `EOF` (End of File), also keine Daten. Es gibt schlicht nichts zu lesen.
+
+#### Typische Anwendungsfälle:
+
+**Ausgaben unterdrücken**
+
+```bash
+   command > /dev/null
+```
+
+Unterdrückt die Standardausgabe (`stdout`) eines Befehls.
+
+**Fehlermeldungen verwerfen**
+
+```bash
+   command 2> /dev/null
+```
+
+Leitet nur die Fehlerausgabe (`stderr`) ins Leere.
+
+**Komplett stumm schalten**
+
+```bash
+   command > /dev/null 2>&1
+```
+
+Sowohl stdout als auch stderr werden verworfen.
+
+**Leere Eingabe erzeugen**
+
+```bash
+   command < /dev/null
+```
+
+Nützlich, wenn ein Programm eine Eingabe erwartet, aber keine benötigt wird (z. B. um interaktive Prompts zu vermeiden).
+
+**Dateien leeren, ohne sie zu löschen**
+
+```bash
+   cat /dev/null > datei.log
+```
+
+Setzt den Inhalt einer Datei auf null Byte zurück, behält aber die Datei (inkl. Rechten) bei.
+
+#### Wichtige Eigenschaften:
+
+- Gehört zur Kategorie der Character Devices (siehe `ls -l /dev/null` -> beginnt mit `c`).
+- Hat üblicherweise die Major/Minor-Nummer 1, 3.
+- Existiert auch als Konzept unter Windows (NUL) und macOS (ebenfalls `/dev/null`).
+- Belegt keinen Speicherplatz, unabhängig davon, wie viele Daten hineingeschrieben werden.
+
+
+
 
 
 
