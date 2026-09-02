@@ -861,7 +861,38 @@ Mit `fg` lässt sich ein Hintergrundprozess (Job) wieder in den Vordergrund hole
 - `bg`: Hintergrundprozess fortsetzen
   - `bg %<jobnummer>`: Hintergrundprozess mit Jobnummer `<jobnummer>` in fortsetzen
 
-TODO ps -o
+#### Ausgabe von `ps` anpassen
+
+Mit der Option `-o` (*output*) können wir festlegen, welche Informationen `ps` anzeigen soll.
+
+```bash
+ps -o pid,ppid,user,stat,cmd
+```
+
+Beispiele für Ausgabefelder:
+
+- `pid`: Prozess-ID
+- `ppid`: Prozess-ID des Elternprozesses
+- `user`: Besitzer des Prozesses
+- `stat`: aktueller Prozessstatus
+- `%cpu`: CPU-Auslastung
+- `%mem`: Arbeitsspeichernutzung
+- `etime`: bisherige Laufzeit
+- `cmd`: Kommando inklusive Argumenten
+
+Mit `-e` werden alle Prozesse berücksichtigt, nicht nur die des aktuellen Terminals:
+
+```bash
+ps -eo pid,ppid,user,%cpu,%mem,etime,cmd
+```
+
+Die Ausgabe kann zusätzlich sortiert werden:
+
+```bash
+ps -eo pid,user,%cpu,%mem,cmd --sort=-%cpu
+```
+
+Das Minuszeichen vor `%cpu` bewirkt eine absteigende Sortierung.
 
 ### kill
 
@@ -887,8 +918,10 @@ pgrep <prozessname>
 - `SIGCONT` (18): führt angehaltene Prozesse fort
 - `SIGSTOP` (19): hält Prozess an und schickt ihn in den Hintergrund, kann aber nicht vom Prozess abgefangen werden, geht direkt an den Kernel
 - `SIGTSTP` (20): hält Prozess an und schickt ihn in den Hintergrund (`STRG+Z`), kann vom Prozess abgefangen werden
+- `SIGHUP` (1): Das *Hangup*-Signal wurde ursprünglich gesendet, wenn eine Terminalverbindung getrennt wurde. Beim Schließen einer Shell oder beim Abbruch einer SSH-Verbindung können davon abhängige Prozesse dieses Signal erhalten und sich daraufhin beenden. Ein Prozess kann `SIGHUP` abfangen oder ignorieren. Viele Daemons verwenden es außerdem als Aufforderung, ihre Konfiguration neu einzulesen, ohne vollständig neu gestartet zu werden.
 
-TODO SIGHUP
+>[!NOTE]
+> Das Neuladen der Konfiguration ist eine Konvention einiger Programme und nicht die allgemeine Bedeutung von `SIGHUP`.
 
 ### Prozessabhängigkeiten bzw. Terminal-unabhängige Ausführung
 
@@ -1006,9 +1039,47 @@ tar -cf archive.tar relativ/path/to/dir
 
 > [!NOTE] 
 > Pfadangaben werden immer mit archiviert! Wir müssen uns also im Vorhinein Gedanken machen, ob wir z.B. einen relativen oder absoluten Pfad angeben.
-> Absolute Pfadangaben werden durch `tar` standardmässig in relative Pfade umgewandelt (`Removing trailing slash`).
+> Absolute Pfadangaben werden durch `tar` standardmässig in relative Pfade umgewandelt (`Removing leading '/' from member names`).
 
-TODO Erklärung
+#### Bedeutung der archivierten Pfade
+
+`tar` speichert die angegebenen Pfade als Namen der Archiveinträge. Beim späteren Entpacken werden diese Pfade wiederhergestellt.
+
+```bash
+tar -cf archiv.tar projekt/datei.txt
+```
+
+Der Archiveintrag lautet dann `projekt/datei.txt`. Beim Entpacken im Verzeichnis `/tmp` entsteht somit:
+
+```text
+/tmp/projekt/datei.txt
+```
+
+Bei einem absoluten Pfad entfernt GNU `tar` standardmäßig den führenden Slash:
+
+```bash
+tar -cf archiv.tar /home/tux/projekt
+# Meldung: Removing leading '/' from member names
+```
+
+Dadurch werden die Dateien beim Entpacken nicht unmittelbar unter `/home/tux`, sondern relativ zum aktuellen Zielverzeichnis angelegt.
+
+Mit der Option `-C` kann das Arbeitsverzeichnis für `tar` festgelegt werden. So lassen sich unerwünscht lange Pfade im Archiv vermeiden:
+
+```bash
+tar -cf archiv.tar -C /home/tux projekt
+```
+
+#### Absolute Pfade beibehalten
+
+Mit `-P` beziehungsweise `--absolute-names` entfernt `tar` den führenden Slash absoluter Pfade nicht:
+
+```bash
+tar -cPf sicherung.tar /etc/hosts
+```
+
+> [!WARNING]
+> Diese Option ist mit Vorsicht zu verwenden. Beim Entpacken können Dateien dadurch an ihren absoluten Speicherort geschrieben und dort vorhandene Dateien überschrieben werden.
 
 #### Dateien aus Archiv extrahieren
 ```bash
@@ -1036,7 +1107,14 @@ tar -rf archive.tar other_file.txt
 tar --append --file archive.tar other_file.txt
 ```
 
-TODO -u -P
+#### Neuere Dateien zum Archiv hinzufügen
+
+Die Option `-u` beziehungsweise `--update` fügt eine Datei nur dann hinzu, wenn sie noch nicht im Archiv vorhanden oder neuer als die bereits archivierte Version ist.
+
+```bash
+tar -uf archive.tar datei.txt
+tar --update --file archive.tar datei.txt
+```
 
 ### Komprimierung
 
@@ -1086,7 +1164,7 @@ tar -czvf archiv.tar.gz somdir/     # verboser Output
 #### bzip2 komprimiertes Archiv erstellen
 ```bash
 tar -cjf archiv.tar.bz2 somdir/
-tar -czjf archiv.tar.bz2 somdir/     # verboser Output
+tar -cjvf archiv.tar.bz2 somdir/     # verboser Output
 ```
 
 #### xz komprimiertes Archiv erstellen
@@ -1094,6 +1172,18 @@ tar -czjf archiv.tar.bz2 somdir/     # verboser Output
 tar -cJf archiv.tar.xz somdir/
 tar -cJvf archiv.tar.xz somdir/     # verboser Output
 ```
+
+#### Kompressionsverfahren anhand der Dateiendung auswählen
+
+Mit `-a` beziehungsweise `--auto-compress` wählt `tar` beim Erstellen eines Archivs das Kompressionsverfahren anhand der Dateiendung aus:
+
+```bash
+tar -caf archiv.tar.gz somedir/
+tar -caf archiv.tar.bz2 somedir/
+tar -caf archiv.tar.xz somedir/
+```
+
+Dadurch müssen `-z`, `-j` oder `-J` nicht ausdrücklich angegeben werden.
 
 #### Komprimiertes Archiv entpacken
 
@@ -1106,7 +1196,7 @@ tar -xzvf archiv.tar.gz
 ##### mit bzip2 komprimiertes Archiv entpacken
 ```bash
 tar -xjf archiv.tar.bz2
-tar -xzjf archiv.tar.bz2
+tar -xjvf archiv.tar.bz2
 ```
 
 ##### mit xz komprimiertes Archiv entpacken
@@ -1132,13 +1222,43 @@ tar -xf archiv.tar.xz
 - `-j`, `--bzip2`  wendet bzip2-Kompression an
 - `-J`, `--xz`  wendet xz-Kompression an
 
-TODO -a
+### ZIP-Archive
 
+Das ZIP-Format vereint Archivierung und Komprimierung in einem Dateiformat. Es ist besonders für den Austausch mit Windows-Systemen weit verbreitet.
 
+>[!NOTE]
+> `zip` ist normalerweise nicht vorinstalliert, muss also erst manuell installiert werden.
 
+#### ZIP-Archiv erstellen
 
+```bash
+zip archiv.zip datei1.txt datei2.txt
+```
 
+Verzeichnisse müssen mit der Option `-r` rekursiv hinzugefügt werden:
 
+```bash
+zip -r archiv.zip verzeichnis/
+```
 
+>[!WARNING]
+> Vergessen wir die Optin `-r` und übergeben `zip` ein Verzeichnis, so wird nur das Verzeichnis an sich komprimiert, allerdings ohne Inhalt bzw. ohne die darin enthaltenen Dateien. 
 
+#### Inhalt eines ZIP-Archivs anzeigen
+
+```bash
+unzip -l archiv.zip
+```
+
+#### ZIP-Archiv entpacken
+
+```bash
+unzip archiv.zip
+```
+
+Mit `-d` kann ein Zielverzeichnis angegeben werden:
+
+```bash
+unzip archiv.zip -d zielverzeichnis/
+```
 
