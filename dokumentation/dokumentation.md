@@ -850,7 +850,7 @@ Ein z.B. mit der Tastenkombination angehaltener und in den Hintergrund verschobe
 
 Mit `fg` lässt sich ein Hintergrundprozess (Job) wieder in den Vordergrund holen (und starten falls angehalten).
 
-- `ps` : Anzeige aller in der aktuellen Shell laufenden Prozesse
+- `ps` : Anzeige aller im aktuellen Terminal laufenden Prozesse
   - `ps -aux`: Anzeige aller laufende Prozessez auf dem System
   - `ps aux`: Anzeige aller laufende Prozessez auf dem System
   - `ps -ef`: auch Anzeige aller laufenden Prozesse auf dem System
@@ -860,6 +860,8 @@ Mit `fg` lässt sich ein Hintergrundprozess (Job) wieder in den Vordergrund hole
   - `fg %<jobnummer>`: Job mit Jobnummer `<jobnummer>` in den Vordergrund holen
 - `bg`: Hintergrundprozess fortsetzen
   - `bg %<jobnummer>`: Hintergrundprozess mit Jobnummer `<jobnummer>` in fortsetzen
+
+TODO ps -o
 
 ### kill
 
@@ -959,6 +961,178 @@ Es gibt mehrere Terminal-Multiplexer, z.B.:
 - `tmux` ist der modernere Nachfolger von `screen` mit verbesserter Architektur und Funktionsumfang und Konfigurationsmöglichkeiten
 - `zellij` ist ein der modernste Terminal-Multiplexer, in Rust geschrieben und auf Benutzerfreundlichkeit optimiert (besseres UI, Floating Panes etc.)
 
+## Archivierung und Komprimierung
+
+### Archivierung mit `tar`
+
+*Archivierung* bezeichnet das Zusammenfassen **mehrerer** Dateien und Verzeichnisse in eine **einzige** Datei, ohne zwingende Kompression. Dadurch bleibt die ursprüngliche Struktur der Dateien erhalten, so können mehrere Dateien einfacher gespeichert oder übertragen werden.
+
+Unter Linux wird das Kommando `tar` (*Tape Archiver*) zur Archivierung verwendet. `tar` ist ein sehr altes Programm und die Syntax (freundlich ausgedrückt) etwas gewöhnungsbedürftig. Kurzoptionen haben oft keine direkte Entsprechung zu den Langoptionen.
+
+Ein `tar`-Archiv kann man sich mit dem Kommando `cat` anzeigen lassen:
+
+![Ausgabe tar Archiv mit cat](./images/ausgabe-tar-archiv-mit-cat.png)
+
+> [!NOTE]
+> Alle numerischen Angaben hier sind im *Oktalformat*. Dies hat historische Gründe. Möchte man den Zeitstempel umrechnen, kann man sich von der BASH helfen lassen:
+> ```bash
+> echo $(( 8#14757403716 ))
+> ```
+
+Einige wichtige Optioenen zu `tar`:
+
+>[!NOTE]
+> Bei `tar` ist die Option `-f` sehr wichtig. Damit müssen wir immer den Namen des Archivs angeben, mit dem wir arbeiten wollen. Die Option `-f` erwartet zwingend ein Argument (den Namen/Pfad zu einem Archiv. Der Name muss **direkt** hinter der Option folgen.
+
+**Beispiele:**
+```bash
+tar -cvf archive.tar file1 file2    # korrekt, funktioniert
+tar -tf archive.tar                 # korrekt, funktioniert
+
+tar -cfv archive.tar file1 file2    # funktioniert NICHT
+tar -ft archive.tar                 # funktioniert NICHT
+```
+
+#### Archiv aus Dateien erstellen
+```bash
+tar -cf archive.tar file1.txt file2.txt file3.txt 
+tar --create --file archive.tar file1.txt file2.txt file3.txt 
+```
+#### Archiv aus einem Verzeichnis erstellen
+```bash
+tar -cf archive.tar /absolute/path/to/dir
+tar -cf archive.tar relativ/path/to/dir
+```
+
+> [!NOTE] 
+> Pfadangaben werden immer mit archiviert! Wir müssen uns also im Vorhinein Gedanken machen, ob wir z.B. einen relativen oder absoluten Pfad angeben.
+> Absolute Pfadangaben werden durch `tar` standardmässig in relative Pfade umgewandelt (`Removing trailing slash`).
+
+TODO Erklärung
+
+#### Dateien aus Archiv extrahieren
+```bash
+tar -xf archive.tar
+tar --extract --file archive.tar
+```
+
+#### Die Option -v / --verbose gibt eine Rückmeldung darüber, was tar macht
+
+```bash
+tar -xvf archive.tar
+tar --extract --verbose --file archive.tar
+```
+
+#### Inhalt eines Archivs anzeigen/auflisten
+```bash
+tar -tf archiv.tar
+tar --list --file archive.tar
+```
+
+#### Datei einem bestehenden Archiv hinzufügen
+
+```bash
+tar -rf archive.tar other_file.txt
+tar --append --file archive.tar other_file.txt
+```
+
+TODO -u -P
+
+### Komprimierung
+
+Durch die Komprimierung können wir **eine einzelne** Datei mit Hilfe bestimmter Algorithmen (verlustfrei) in ihrer Grösse verkleinern.
+
+*Analogie Komprimierung:* getrocknete Handtücher, die im Wasser wieder gross werden
+
+*Analogie Archivierung:* einzelne Blumen werden zu einem Strauss gebunden
+
+Um **mehrere** Dateien oder ganze Verzeichnisse zu komprimieren, müssen wir zusätzlich im Vorfeld die *Archivierung* anwenden. Bestimmte Programme in Windows-Systemen vereinen diese beiden Konzepte unter einer Haube. Wir müssen uns jedoch merken, dass dies grundsätzlich zwei komplett verschiedene Konzepte sind.
+
+Auch unter Linux ist es möglich beide Schritte auf einmal mit dem Kommando `tar` durchzuführen, dabei ruft `tar` im Hintergrund jedoch die jeweiligen Kommandos zur Komprimierung auf.
+
+Unter Linux nutzen wir standardmässig drei verschiedene Tools zur Komprimierung: `gzip`, `bzip2` und `xz`.
+
+>[!NOTE]
+> Sowohl bei der Komprimierung als auch bei der Dekomprimierung wird die jeweilige Originaldatei nicht behalten, sondern ersetzt.
+> Dies können wir mit der Option `-k` (`--keep`) umgehen.
+
+### Vergleich der drei Komprimierungsalgorithmen
+
+Vergleich der Geschwindigkeiten und resultierenden Grössen beim Komprimieren:
+
+![vergleich-komprimierung](./images/vergleich-komprimierung.png)
+Vergleich der Geschwindigkeiten beim Dekomprimieren:
+
+![vergleich-dekomprimierung](./images/vergleich-dekomprimierung.png)
+Zusammenfassend lassen sich folgende Aussagen über die drei Komprimierungsalgorithmen treffen:
+
+- `gzip` ist am schnellsten bei der Komprimierung, die komprimierte Datei ist aber nicht besonders klein
+- `bzip2` braucht lange für die Komprimierung und die Dekomprimierung, erzeugt aber eine ziemlich kleine Datei
+- `xz` braucht ziemlich lange bei der Komprimierung, erzeugt liegt bei der Kompressionsrate zwischen den beiden anderen, ist aber sehr schnell bei der Dekomprimierung
+
+Es gibt also für alle drei bestimmte Anwendungsfälle, in denen sie ihre Stärken ausspielen können.
+
+>[!NOTE] Unser Beispiel begünstigt ältere Komprimierungsalgorithmen. In einem echten Beispiel würde `xz` neben der schnellsten Dekomprimierung auch die höchste Kompressionsrate erzielen.
+
+### Erstellen und Entpacken eines komprimierten Archivs direkt mit `tar`
+
+
+#### gzip komprimiertes Archiv erstellen
+```bash
+tar -czf archiv.tar.gz somdir/
+tar -czvf archiv.tar.gz somdir/     # verboser Output
+```
+
+#### bzip2 komprimiertes Archiv erstellen
+```bash
+tar -cjf archiv.tar.bz2 somdir/
+tar -czjf archiv.tar.bz2 somdir/     # verboser Output
+```
+
+#### xz komprimiertes Archiv erstellen
+```bash
+tar -cJf archiv.tar.xz somdir/
+tar -cJvf archiv.tar.xz somdir/     # verboser Output
+```
+
+#### Komprimiertes Archiv entpacken
+
+##### mit gzip komprimiertes Archiv entpacken
+```bash
+tar -xzf archiv.tar.gz
+tar -xzvf archiv.tar.gz
+```
+
+##### mit bzip2 komprimiertes Archiv entpacken
+```bash
+tar -xjf archiv.tar.bz2
+tar -xzjf archiv.tar.bz2
+```
+
+##### mit xz komprimiertes Archiv entpacken
+```bash
+tar -xJf archiv.tar.xz
+tar -xJvf archiv.tar.xz
+```
+
+##### automatisch jeweiligen Algorithmus ermitteln, Archiv dekomprimieren und Dateien extrahieren
+```bash
+tar -xf archiv.tar.gz
+tar -xf archiv.tar.bz2
+tar -xf archiv.tar.xz
+```
+
+#### Erklärung der Optionen:
+
+- `-c`, `--create`  erstellt ein neues Archiv
+- `-x`, `--extract`  entpackt ein Archiv
+- `-f`, `--file`  gibt den Dateinamen des Archivs an (immer direkt danach)
+ 
+- `-z`, `--gzip`  wendet gzip-Kompression an
+- `-j`, `--bzip2`  wendet bzip2-Kompression an
+- `-J`, `--xz`  wendet xz-Kompression an
+
+TODO -a
 
 
 
